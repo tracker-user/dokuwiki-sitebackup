@@ -101,7 +101,7 @@ class admin_plugin_sitebackup extends AdminPlugin
         echo '<h1>Site Backup</h1>';
         echo '<p>Select what to include, click <em>Preview</em> to see the file list and total size, '
             . 'then <em>Download tar.gz</em> to receive the archive in your browser.</p>';
-        echo '<p style="background:#fff3cd;border:1px solid #ffeeba;padding:8px;border-radius:4px;">'
+        echo '<p style="background:#fff3cd; border:1px solid #ffeeba; padding:8px; border-radius:4px;">'
             . '<strong>Sensitive content warning.</strong> The archive may contain password hashes '
             . '(<code>conf/users.auth.php</code>), ACL rules, and any secrets stored in '
             . '<code>conf/local.php</code> (DB credentials, SMTP passwords, API keys). '
@@ -145,7 +145,9 @@ class admin_plugin_sitebackup extends AdminPlugin
         $form->setHiddenField('do', 'admin');
         $form->setHiddenField('page', 'sitebackup');
 
-        $form->addFieldsetOpen('Wiki content');
+        $style = 'text-align: left; padding: 0 1em .5em 1em; margin: 1em 0;';
+
+        $form->addFieldsetOpen('Wiki content')->attr('style', $style);
         $this->addCheckboxRow($form, 'sb_pages',       'Pages (data/pages)',                          $sel['pages']);
         $this->addCheckboxRow($form, 'sb_media',       'Media files (data/media)',                    $sel['media']);
         $this->addCheckboxRow($form, 'sb_meta',        'Page metadata (data/meta)',                   $sel['meta']);
@@ -155,7 +157,7 @@ class admin_plugin_sitebackup extends AdminPlugin
         $this->addCheckboxRow($form, 'sb_index',       'Search index (data/index) - rebuildable',     $sel['index']);
         $form->addFieldsetClose();
 
-        $form->addFieldsetOpen('Configuration & code');
+        $form->addFieldsetOpen('Configuration & code')->attr('style', $style);
         $this->addCheckboxRow($form, 'sb_conf',    'Configuration (conf/) - includes secrets',  $sel['conf']);
         $this->addCheckboxRow($form, 'sb_plugins', 'Plugins source (lib/plugins/)',             $sel['plugins']);
         $this->addCheckboxRow($form, 'sb_tpl',     'Templates source (lib/tpl/)',               $sel['tpl']);
@@ -163,7 +165,7 @@ class admin_plugin_sitebackup extends AdminPlugin
 
         $form->addTagOpen('p');
         $form->addButton('sitebackup_action', 'Preview')->val('preview');
-        $form->addHTML(' ');
+        $form->addHTML(' &nbsp;&nbsp; ');
         $form->addButton('sitebackup_action', 'Download tar.gz')->val('download');
         $form->addTagClose('p');
 
@@ -172,7 +174,7 @@ class admin_plugin_sitebackup extends AdminPlugin
 
     protected function addCheckboxRow(Form $form, $name, $label, $checked)
     {
-        $form->addTagOpen('div')->attr('style', 'margin:4px 0;');
+        $form->addTagOpen('div')->attr('style', 'margin:.4em 0;');
         $cb = $form->addCheckbox($name, ' ' . $label);
         $cb->val('1');
         if ($checked) $cb->attr('checked', 'checked');
@@ -311,7 +313,7 @@ class admin_plugin_sitebackup extends AdminPlugin
         }
         ksort($perRoot);
 
-        echo '<table class="inline"><thead><tr><th>Section</th><th>Files</th><th>Size</th></tr></thead><tbody>';
+        echo '<table class="inline"><thead><tr><th>Section</th><th style="text-align:right;">Files</th><th style="text-align:right;">Size</th></tr></thead><tbody>';
         foreach ($perRoot as $section => $stats) {
             echo '<tr><td><code>' . hsc($section) . '</code></td>'
                 . '<td style="text-align:right;">' . (int)$stats['count'] . '</td>'
