@@ -25,9 +25,13 @@
 
 use dokuwiki\Extension\AdminPlugin;
 use dokuwiki\Form\Form;
-use splitbrain\PHPArchive\Tar;
 use splitbrain\PHPArchive\Archive;
 use splitbrain\PHPArchive\ArchiveIOException;
+
+// PatchedTar fixes splitbrain/php-archive PR #38 (mtime bug) for the version
+// of the library vendored with DokuWiki Librarian.
+require_once __DIR__ . '/PatchedTar.php';
+use dokuwiki\plugin\sitebackup\PatchedTar as Tar;
 
 class admin_plugin_sitebackup extends AdminPlugin
 {

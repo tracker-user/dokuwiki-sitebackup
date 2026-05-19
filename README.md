@@ -76,6 +76,10 @@ Tested on DokuWiki `2025-05-14b "Librarian"`. Should work on Greebo / Hogfather 
 
 PHP 7.4 or newer (uses array destructuring in `foreach` and `??`).
 
+## Notes on bundled patches
+
+`PatchedTar.php` is a 30-line subclass of `splitbrain\PHPArchive\Tar` that fixes a bug in the version of `splitbrain/php-archive` vendored with DokuWiki Librarian: `Tar::writeRawFileHeader()` overwrites the mtime with the size, so every file in a generated tar reads as 1970-01-01 with a size-derived offset. Fixed in [splitbrain/php-archive PR #38](https://github.com/splitbrain/php-archive/pull/38) but DokuWiki hasn't bumped the vendor lib yet. Once it does, `PatchedTar.php` can be deleted and `admin.php` switched back to using `splitbrain\PHPArchive\Tar` directly.
+
 ## License
 
 GPL-2.0-or-later, matching DokuWiki itself.
