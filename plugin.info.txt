@@ -5,3 +5,4 @@ date   2026-05-19
 name   Site Backup
 desc   Download a tar.gz of selected wiki files (pages, media, conf, lib/plugins, lib/tpl)
 url    https://github.com/tracker-user/dokuwiki-sitebackup
+phpmin 7.4
