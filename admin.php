@@ -1,4 +1,6 @@
 <?php
+if (!defined('DOKU_INC')) die();
+
 /**
  * Site Backup admin plugin for DokuWiki.
  *
@@ -47,19 +49,20 @@ class admin_plugin_sitebackup extends AdminPlugin
     /** @var int total uncompressed size of selected files */
     protected $totalBytes = 0;
 
-    public function forAdminOnly()
+    /**
+     * @return bool
+     */
+    public function forAdminOnly(): bool
     {
         return true;
     }
 
-    public function getMenuSort()
+    /**
+     * @return int
+     */
+    public function getMenuSort(): int
     {
         return 1000;
-    }
-
-    public function getMenuText($language)
-    {
-        return 'Site Backup';
     }
 
     /**
@@ -67,7 +70,7 @@ class admin_plugin_sitebackup extends AdminPlugin
      * Valid actions: "preview" (build file list, render summary table),
      *                "download" (build archive, stream as tar.gz).
      */
-    public function handle()
+    public function handle(): void
     {
         global $INPUT;
 
@@ -82,7 +85,7 @@ class admin_plugin_sitebackup extends AdminPlugin
 
         // Download MUST be POST. Refuse GET / HEAD / etc. so a stray link, browser
         // prefetch, or curious co-admin pasting a URL can't trigger a backup.
-        if ($action === 'download' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        if ($action === 'download' && $INPUT->server->str('REQUEST_METHOD', 'GET') !== 'POST') {
             msg('Site Backup: download must be submitted via POST.', -1);
             return;
         }
@@ -96,7 +99,10 @@ class admin_plugin_sitebackup extends AdminPlugin
         }
     }
 
-    public function html()
+    /**
+     * Render the admin page: intro, form, and (if $fileList is populated) preview table.
+     */
+    public function html(): void
     {
         echo '<h1>Site Backup</h1>';
         echo '<p>Select what to include, click <em>Preview</em> to see the file list and total size, '
@@ -119,7 +125,10 @@ class admin_plugin_sitebackup extends AdminPlugin
      *  Form
      * ----------------------------------------------------------------- */
 
-    protected function renderForm()
+    /**
+     * Render the selection form with checkboxes for each backup section.
+     */
+    protected function renderForm(): void
     {
         global $INPUT;
 
@@ -172,7 +181,15 @@ class admin_plugin_sitebackup extends AdminPlugin
         echo $form->toHTML();
     }
 
-    protected function addCheckboxRow(Form $form, $name, $label, $checked)
+    /**
+     * Add a labelled checkbox row to the form.
+     *
+     * @param Form   $form
+     * @param string $name    field name
+     * @param string $label   display label
+     * @param bool   $checked whether the checkbox is pre-checked
+     */
+    protected function addCheckboxRow(Form $form, string $name, string $label, bool $checked): void
     {
         $form->addTagOpen('div')->attr('style', 'margin:.4em 0;');
         $cb = $form->addCheckbox($name, ' ' . $label);
@@ -185,7 +202,10 @@ class admin_plugin_sitebackup extends AdminPlugin
      *  File collection
      * ----------------------------------------------------------------- */
 
-    protected function collectFiles()
+    /**
+     * Build $this->fileList from the selected checkboxes in the current request.
+     */
+    protected function collectFiles(): void
     {
         global $INPUT, $conf;
 
@@ -210,7 +230,13 @@ class admin_plugin_sitebackup extends AdminPlugin
         }
     }
 
-    protected function walkInto($srcAbs, $archiveRel)
+    /**
+     * Recursively enumerate all readable files under $srcAbs and append them to $this->fileList.
+     *
+     * @param string $srcAbs     absolute filesystem path (file or directory)
+     * @param string $archiveRel path prefix to use inside the archive
+     */
+    protected function walkInto(string $srcAbs, string $archiveRel): void
     {
         if (!file_exists($srcAbs)) return;
 
@@ -249,12 +275,14 @@ class admin_plugin_sitebackup extends AdminPlugin
     }
 
     /**
-     * Filename / path-segment ignores. Hardcoded (no config) to keep the plugin small.
+     * Return true if a file should be excluded from the archive.
+     * Hardcoded (no config) to keep the plugin small.
      *
-     * @param string $archiveRel  e.g. "conf" or "lib/plugins" - the top-level branch
-     * @param string $rel         path within that branch
+     * @param string $archiveRel top-level archive branch, e.g. "conf" or "lib/plugins"
+     * @param string $rel        path within that branch
+     * @return bool
      */
-    protected function isIgnored($archiveRel, $rel)
+    protected function isIgnored(string $archiveRel, string $rel): bool
     {
         $base = basename($rel);
 
@@ -265,7 +293,7 @@ class admin_plugin_sitebackup extends AdminPlugin
 
         // Belt-and-suspenders: never include our own scratch files even if
         // someone pointed savedir at an unusual location.
-        if (strpos($base, self::TMP_PREFIX) === 0) return true;
+        if (str_starts_with($base, self::TMP_PREFIX)) return true;
 
         // Skip VCS metadata anywhere in any branch. Local clones / checkouts
         // can be huge and aren't part of "live" state.
@@ -285,9 +313,15 @@ class admin_plugin_sitebackup extends AdminPlugin
         return false;
     }
 
-    protected function appendFile($abs, $archiveRel)
+    /**
+     * Append a single file entry to the file list.
+     *
+     * @param string $abs        absolute filesystem path
+     * @param string $archiveRel path inside the archive
+     */
+    protected function appendFile(string $abs, string $archiveRel): void
     {
-        $size = @filesize($abs);
+        $size = filesize($abs);
         if ($size === false) $size = 0;
         $this->fileList[] = [$abs, $archiveRel, $size];
         $this->totalBytes += $size;
@@ -297,7 +331,10 @@ class admin_plugin_sitebackup extends AdminPlugin
      *  Preview
      * ----------------------------------------------------------------- */
 
-    protected function renderPreview()
+    /**
+     * Render a summary table grouping files by top-level archive section.
+     */
+    protected function renderPreview(): void
     {
         echo '<h2>Preview</h2>';
         echo '<p>' . count($this->fileList) . ' files, '
@@ -324,7 +361,13 @@ class admin_plugin_sitebackup extends AdminPlugin
             . '(compressed size will typically be smaller).</p>';
     }
 
-    protected function humanBytes($bytes)
+    /**
+     * Format a byte count as a human-readable string (B, KiB, MiB, GiB, TiB).
+     *
+     * @param int $bytes
+     * @return string
+     */
+    protected function humanBytes(int $bytes): string
     {
         $units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
         $i = 0;
@@ -340,9 +383,14 @@ class admin_plugin_sitebackup extends AdminPlugin
      *  Archive creation + streaming
      * ----------------------------------------------------------------- */
 
-    protected function streamArchive()
+    /**
+     * Build the archive in data/tmp/, stream it to the browser as a tar.gz download,
+     * and exit. Returns without exiting only when an error prevents streaming, so the
+     * caller can fall through to html() and display the form again.
+     */
+    protected function streamArchive(): void
     {
-        global $conf;
+        global $conf, $INPUT;
 
         // Defense-in-depth: AdminPlugin framework should have blocked non-admins
         // before we got here, but verify directly anyway.
@@ -356,9 +404,9 @@ class admin_plugin_sitebackup extends AdminPlugin
             return;
         }
 
-        @set_time_limit(0);
-        @ignore_user_abort(true);
-        @ini_set('memory_limit', '256M');
+        set_time_limit(0);
+        ignore_user_abort(true);
+        ini_set('memory_limit', '256M');
 
         $tmpDir = $conf['tmpdir'];
         if (!is_dir($tmpDir) || !is_writable($tmpDir)) {
@@ -369,7 +417,7 @@ class admin_plugin_sitebackup extends AdminPlugin
         // Build a hard-to-guess filename. 16 hex chars = 64 bits of entropy from
         // a CSPRNG. The file also lives under data/.htaccess deny-all so even a
         // guess wouldn't be enough.
-        $host = $_SERVER['HTTP_HOST'] ?? 'wiki';
+        $host = $INPUT->server->str('HTTP_HOST', 'wiki');
         $host = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $host);
         $stamp = date('Ymd-His');
         $archiveDir = $host . '-backup-' . $stamp;             // dir inside the tar
@@ -379,10 +427,10 @@ class admin_plugin_sitebackup extends AdminPlugin
         // Guarantee the temp file is deleted even on connection abort, fatal
         // error, or `exit` from within the streaming loop.
         register_shutdown_function(function () use ($tmpFile) {
-            if (is_file($tmpFile)) @unlink($tmpFile);
+            if (is_file($tmpFile)) unlink($tmpFile);
         });
 
-        $oldUmask = @umask(0077);
+        $oldUmask = umask(0077);
 
         try {
             $tar = new Tar();
@@ -391,7 +439,7 @@ class admin_plugin_sitebackup extends AdminPlugin
 
             // Belt-and-suspenders: explicitly chmod once created, in case the
             // umask wasn't honored (some filesystems / wrappers ignore it).
-            @chmod($tmpFile, 0600);
+            chmod($tmpFile, 0600);
 
             foreach ($this->fileList as [$abs, $rel, $size]) {
                 try {
@@ -403,16 +451,16 @@ class admin_plugin_sitebackup extends AdminPlugin
             }
             $tar->close();
         } catch (ArchiveIOException $e) {
-            @umask($oldUmask);
-            @unlink($tmpFile);
+            umask($oldUmask);
+            if (is_file($tmpFile)) unlink($tmpFile);
             msg('Site Backup: could not create archive: ' . hsc($e->getMessage()), -1);
             return;
         }
 
-        @umask($oldUmask);
+        umask($oldUmask);
 
         if (!is_file($tmpFile) || filesize($tmpFile) === 0) {
-            @unlink($tmpFile);
+            if (is_file($tmpFile)) unlink($tmpFile);
             msg('Site Backup: archive was empty or could not be written.', -1);
             return;
         }
@@ -422,7 +470,7 @@ class admin_plugin_sitebackup extends AdminPlugin
         // Clear any output buffering DokuWiki / extensions may have started so
         // headers + binary body go out cleanly.
         while (ob_get_level() > 0) {
-            @ob_end_clean();
+            ob_end_clean();
         }
 
         header('Content-Type: application/gzip');
@@ -438,11 +486,11 @@ class admin_plugin_sitebackup extends AdminPlugin
                 $chunk = fread($fp, 1024 * 256);
                 if ($chunk === false) break;
                 echo $chunk;
-                @flush();
+                flush();
             }
             fclose($fp);
         }
-        @unlink($tmpFile);
+        unlink($tmpFile);
         exit;
     }
 
@@ -450,7 +498,7 @@ class admin_plugin_sitebackup extends AdminPlugin
      * Remove leftover temp archives from prior runs that died before unlink.
      * Anything matching our prefix older than TMP_STALE_AGE is fair game.
      */
-    protected function sweepStaleTempFiles()
+    protected function sweepStaleTempFiles(): void
     {
         global $conf;
         $tmpDir = $conf['tmpdir'] ?? null;
@@ -458,11 +506,11 @@ class admin_plugin_sitebackup extends AdminPlugin
 
         $cutoff = time() - self::TMP_STALE_AGE;
         $pattern = $tmpDir . '/' . self::TMP_PREFIX . '*';
-        foreach ((array) @glob($pattern) as $stale) {
+        foreach ((array) glob($pattern) as $stale) {
             if (!is_file($stale)) continue;
-            $mtime = @filemtime($stale);
+            $mtime = filemtime($stale);
             if ($mtime !== false && $mtime < $cutoff) {
-                @unlink($stale);
+                unlink($stale);
             }
         }
     }

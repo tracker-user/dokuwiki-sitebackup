@@ -10,7 +10,7 @@ DokuWiki has the well-known [`backup`](https://www.dokuwiki.org/plugin:backup) p
 
 - **The archive is never left on the server.** The `backup` plugin writes the tar to `data/media/wiki/backup/` and relies on the admin correctly configuring an ACL on that namespace; the plugin page warns that "It is important to secure the backup namespace by ACLs otherwise your backup files can be downloaded by anyone". Site Backup instead writes to `data/tmp/` (which DokuWiki already protects with a deny-all `.htaccess`), with a random filename, and `unlink()`s the file as soon as the download completes (or the connection is aborted, or PHP crashes).
 - **The upstream `backup` plugin's author [retired](https://www.freelists.org/post/dokuwiki/Fwd-Retiring-my-DW-plugins) and archived the repo in 2020.** It still works via DokuWiki's legacy class alias, but it's no longer maintained.
-- **Single file.** Roughly 400 lines of one well-commented `admin.php`. No external assets, no language files for ten locales, no preference store. Easy to audit before installing on a wiki you share with other admins.
+- **Minimal footprint.** `admin.php` plus a small `PatchedTar.php` shim and language files for four locales (en, de, ru, ja). No external assets, no preference store. Easy to audit before installing on a wiki you share with other admins.
 
 If you don't share the "ephemeral archive" requirement and you prefer something with a longer track record, the upstream `backup` plugin is a perfectly reasonable choice.
 
