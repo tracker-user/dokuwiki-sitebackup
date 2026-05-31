@@ -32,7 +32,8 @@ use splitbrain\PHPArchive\ArchiveIOException;
 
 // PatchedTar fixes splitbrain/php-archive PR #38 (mtime bug) for the version
 // of the library vendored with DokuWiki Librarian.
-require_once __DIR__ . '/PatchedTar.php';
+// The class lives in PatchedTar.php and is autoloaded via DokuWiki's PSR-4 loader
+// (dokuwiki\plugin\sitebackup namespace -> lib/plugins/sitebackup/).
 use dokuwiki\plugin\sitebackup\PatchedTar as Tar;
 
 class admin_plugin_sitebackup extends AdminPlugin
@@ -48,6 +49,14 @@ class admin_plugin_sitebackup extends AdminPlugin
 
     /** @var int total uncompressed size of selected files */
     protected $totalBytes = 0;
+
+    /**
+     * Tracks real paths already added to the archive to prevent double-inclusion
+     * via symlinks pointing to the same file.
+     *
+     * @var array<string, true>
+     */
+    protected $visitedPaths = [];
 
     /**
      * @return bool
@@ -86,7 +95,7 @@ class admin_plugin_sitebackup extends AdminPlugin
         // Download MUST be POST. Refuse GET / HEAD / etc. so a stray link, browser
         // prefetch, or curious co-admin pasting a URL can't trigger a backup.
         if ($action === 'download' && $INPUT->server->str('REQUEST_METHOD', 'GET') !== 'POST') {
-            msg('Site Backup: download must be submitted via POST.', -1);
+            msg($this->getLang('err_post'), -1);
             return;
         }
 
@@ -104,14 +113,11 @@ class admin_plugin_sitebackup extends AdminPlugin
      */
     public function html(): void
     {
-        echo '<h1>Site Backup</h1>';
-        echo '<p>Select what to include, click <em>Preview</em> to see the file list and total size, '
-            . 'then <em>Download tar.gz</em> to receive the archive in your browser.</p>';
+        echo '<h1>' . hsc($this->getLang('menu')) . '</h1>';
+        echo '<p>' . $this->getLang('intro') . '</p>';
         echo '<p style="background:#fff3cd; border:1px solid #ffeeba; padding:8px; border-radius:4px;">'
-            . '<strong>Sensitive content warning.</strong> The archive may contain password hashes '
-            . '(<code>conf/users.auth.php</code>), ACL rules, and any secrets stored in '
-            . '<code>conf/local.php</code> (DB credentials, SMTP passwords, API keys). '
-            . 'Treat the download like a credential.'
+            . '<strong>' . hsc($this->getLang('warn_title')) . '</strong> '
+            . $this->getLang('warn_body')
             . '</p>';
 
         $this->renderForm();
@@ -156,26 +162,26 @@ class admin_plugin_sitebackup extends AdminPlugin
 
         $style = 'text-align: left; padding: 0 1em .5em 1em; margin: 1em 0;';
 
-        $form->addFieldsetOpen('Wiki content')->attr('style', $style);
-        $this->addCheckboxRow($form, 'sb_pages',       'Pages (data/pages)',                          $sel['pages']);
-        $this->addCheckboxRow($form, 'sb_media',       'Media files (data/media)',                    $sel['media']);
-        $this->addCheckboxRow($form, 'sb_meta',        'Page metadata (data/meta)',                   $sel['meta']);
-        $this->addCheckboxRow($form, 'sb_media_meta',  'Media metadata (data/media_meta)',            $sel['media_meta']);
-        $this->addCheckboxRow($form, 'sb_attic',       'Page revisions (data/attic) - can be large',  $sel['attic']);
-        $this->addCheckboxRow($form, 'sb_media_attic', 'Media revisions (data/media_attic)',          $sel['media_attic']);
-        $this->addCheckboxRow($form, 'sb_index',       'Search index (data/index) - rebuildable',     $sel['index']);
+        $form->addFieldsetOpen($this->getLang('fs_content'))->attr('style', $style);
+        $this->addCheckboxRow($form, 'sb_pages',       $this->getLang('opt_pages'),       $sel['pages']);
+        $this->addCheckboxRow($form, 'sb_media',       $this->getLang('opt_media'),       $sel['media']);
+        $this->addCheckboxRow($form, 'sb_meta',        $this->getLang('opt_meta'),        $sel['meta']);
+        $this->addCheckboxRow($form, 'sb_media_meta',  $this->getLang('opt_media_meta'),  $sel['media_meta']);
+        $this->addCheckboxRow($form, 'sb_attic',       $this->getLang('opt_attic'),       $sel['attic']);
+        $this->addCheckboxRow($form, 'sb_media_attic', $this->getLang('opt_media_attic'), $sel['media_attic']);
+        $this->addCheckboxRow($form, 'sb_index',       $this->getLang('opt_index'),       $sel['index']);
         $form->addFieldsetClose();
 
-        $form->addFieldsetOpen('Configuration & code')->attr('style', $style);
-        $this->addCheckboxRow($form, 'sb_conf',    'Configuration (conf/) - includes secrets',  $sel['conf']);
-        $this->addCheckboxRow($form, 'sb_plugins', 'Plugins source (lib/plugins/)',             $sel['plugins']);
-        $this->addCheckboxRow($form, 'sb_tpl',     'Templates source (lib/tpl/)',               $sel['tpl']);
+        $form->addFieldsetOpen($this->getLang('fs_code'))->attr('style', $style);
+        $this->addCheckboxRow($form, 'sb_conf',    $this->getLang('opt_conf'),    $sel['conf']);
+        $this->addCheckboxRow($form, 'sb_plugins', $this->getLang('opt_plugins'), $sel['plugins']);
+        $this->addCheckboxRow($form, 'sb_tpl',     $this->getLang('opt_tpl'),     $sel['tpl']);
         $form->addFieldsetClose();
 
         $form->addTagOpen('p');
-        $form->addButton('sitebackup_action', 'Preview')->val('preview');
+        $form->addButton('sitebackup_action', $this->getLang('btn_preview'))->val('preview');
         $form->addHTML(' &nbsp;&nbsp; ');
-        $form->addButton('sitebackup_action', 'Download tar.gz')->val('download');
+        $form->addButton('sitebackup_action', $this->getLang('btn_download'))->val('download');
         $form->addTagClose('p');
 
         echo $form->toHTML();
@@ -208,6 +214,10 @@ class admin_plugin_sitebackup extends AdminPlugin
     protected function collectFiles(): void
     {
         global $INPUT, $conf;
+
+        $this->fileList     = [];
+        $this->totalBytes   = 0;
+        $this->visitedPaths = [];
 
         // Use $conf[...] for the data dirs so relocated savedir installs still work.
         $roots = [
@@ -262,6 +272,13 @@ class admin_plugin_sitebackup extends AdminPlugin
         foreach ($it as $info) {
             try {
                 if (!$info->isFile() || !$info->isReadable()) continue;
+
+                // Skip files already included via a different symlink path.
+                $realPath = $info->getRealPath();
+                if ($realPath === false) continue;
+                if (isset($this->visitedPaths[$realPath])) continue;
+                $this->visitedPaths[$realPath] = true;
+
                 $abs = $info->getPathname();
                 $rel = str_replace('\\', '/', substr($abs, $rootLen));
 
@@ -336,9 +353,12 @@ class admin_plugin_sitebackup extends AdminPlugin
      */
     protected function renderPreview(): void
     {
-        echo '<h2>Preview</h2>';
-        echo '<p>' . count($this->fileList) . ' files, '
-            . hsc($this->humanBytes($this->totalBytes)) . ' uncompressed.</p>';
+        echo '<h2>' . hsc($this->getLang('preview_head')) . '</h2>';
+        echo '<p>' . sprintf(
+            $this->getLang('preview_summary'),
+            count($this->fileList),
+            hsc($this->humanBytes($this->totalBytes))
+        ) . '</p>';
 
         $perRoot = [];
         foreach ($this->fileList as [$abs, $rel, $size]) {
@@ -350,15 +370,18 @@ class admin_plugin_sitebackup extends AdminPlugin
         }
         ksort($perRoot);
 
-        echo '<table class="inline"><thead><tr><th>Section</th><th style="text-align:right;">Files</th><th style="text-align:right;">Size</th></tr></thead><tbody>';
+        echo '<table class="inline"><thead><tr>'
+            . '<th>' . hsc($this->getLang('col_section')) . '</th>'
+            . '<th style="text-align:right;">' . hsc($this->getLang('col_files')) . '</th>'
+            . '<th style="text-align:right;">' . hsc($this->getLang('col_size')) . '</th>'
+            . '</tr></thead><tbody>';
         foreach ($perRoot as $section => $stats) {
             echo '<tr><td><code>' . hsc($section) . '</code></td>'
                 . '<td style="text-align:right;">' . (int)$stats['count'] . '</td>'
                 . '<td style="text-align:right;">' . hsc($this->humanBytes($stats['bytes'])) . '</td></tr>';
         }
         echo '</tbody></table>';
-        echo '<p>Click <em>Download tar.gz</em> above to create and download the archive '
-            . '(compressed size will typically be smaller).</p>';
+        echo '<p>' . $this->getLang('preview_hint') . '</p>';
     }
 
     /**
@@ -395,22 +418,35 @@ class admin_plugin_sitebackup extends AdminPlugin
         // Defense-in-depth: AdminPlugin framework should have blocked non-admins
         // before we got here, but verify directly anyway.
         if (!auth_isadmin()) {
-            msg('Site Backup: admin access required.', -1);
+            msg($this->getLang('err_admin'), -1);
             return;
         }
 
         if (!$this->fileList) {
-            msg('Site Backup: nothing selected.', -1);
+            msg($this->getLang('err_empty'), -1);
             return;
         }
 
         set_time_limit(0);
         ignore_user_abort(true);
-        ini_set('memory_limit', '256M');
+
+        // Only raise the memory limit, never lower it.
+        $rawLimit = ini_get('memory_limit');
+        $unit     = strtolower(substr($rawLimit, -1));
+        $limitVal = (int)$rawLimit;
+        switch ($unit) {
+            case 'g': $limitBytes = $limitVal * 1073741824; break;
+            case 'm': $limitBytes = $limitVal * 1048576;    break;
+            case 'k': $limitBytes = $limitVal * 1024;       break;
+            default:  $limitBytes = $limitVal;              break;
+        }
+        if ($limitBytes !== -1 && $limitBytes < 268435456) {
+            ini_set('memory_limit', '256M');
+        }
 
         $tmpDir = $conf['tmpdir'];
         if (!is_dir($tmpDir) || !is_writable($tmpDir)) {
-            msg('Site Backup: temp directory is not writable: ' . hsc($tmpDir), -1);
+            msg(sprintf($this->getLang('err_tmp'), hsc($tmpDir)), -1);
             return;
         }
 
@@ -453,7 +489,7 @@ class admin_plugin_sitebackup extends AdminPlugin
         } catch (ArchiveIOException $e) {
             umask($oldUmask);
             if (is_file($tmpFile)) unlink($tmpFile);
-            msg('Site Backup: could not create archive: ' . hsc($e->getMessage()), -1);
+            msg(sprintf($this->getLang('err_create'), hsc($e->getMessage())), -1);
             return;
         }
 
@@ -461,7 +497,7 @@ class admin_plugin_sitebackup extends AdminPlugin
 
         if (!is_file($tmpFile) || filesize($tmpFile) === 0) {
             if (is_file($tmpFile)) unlink($tmpFile);
-            msg('Site Backup: archive was empty or could not be written.', -1);
+            msg($this->getLang('err_archive'), -1);
             return;
         }
 

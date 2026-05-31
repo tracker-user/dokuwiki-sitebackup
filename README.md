@@ -74,7 +74,7 @@ Same path: **Admin → Extension Manager**, find **Site Backup** under Installed
 
 Tested on DokuWiki `2025-05-14b "Librarian"`. Should work on Greebo / Hogfather / Igor / Jack Jackrum / Kaos as well — the only DokuWiki APIs used are `AdminPlugin`, `dokuwiki\Form\Form`, `auth_isadmin()`, `checkSecurityToken()`, `msg()`, and the bundled `splitbrain\PHPArchive\Tar`, all of which have been stable. No external dependencies; uses only what ships with DokuWiki.
 
-PHP 7.4 or newer (uses array destructuring in `foreach` and `??`).
+PHP 7.4 or newer (uses array destructuring in `foreach` and `??`). `str_starts_with()` is also used, but DokuWiki polyfills it in `inc/compatibility.php`, so PHP 8.0 is not required.
 
 ## Notes on bundled patches
 
