@@ -4,6 +4,8 @@ An admin plugin for [DokuWiki](https://www.dokuwiki.org/) that builds a `tar.gz`
 
 Built for and tested against DokuWiki `2025-05-14b "Librarian"`.
 
+![Backup options with preview pane showing file counts and sizes](images/sitebackup-screen.png)
+
 ## Why another backup plugin?
 
 DokuWiki has the well-known [`backup`](https://www.dokuwiki.org/plugin:backup) plugin by Terence J. Grant, which solves the same problem. This plugin exists because:

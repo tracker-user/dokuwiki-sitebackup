@@ -1,7 +1,7 @@
 base   sitebackup
 author TrackerUser
 email  for-open-source-projects-trust-building@protonmail.com
-date   2026-05-31
+date   2026-06-17
 name   Site Backup
 desc   Download a tar.gz of selected wiki files (pages, media, conf, lib/plugins, lib/tpl)
 url    https://github.com/tracker-user/dokuwiki-sitebackup
