@@ -9,7 +9,7 @@ $lang['warn_body']  = 'Das Archiv kann Passwort-Hashes (<code>conf/users.auth.ph
 
 // Feldgruppen
 $lang['fs_content'] = 'Wiki-Inhalte';
-$lang['fs_code']    = 'Konfiguration &amp; Code';
+$lang['fs_code']    = 'Konfiguration & Code';
 
 // Kontrollkästchen
 $lang['opt_pages']       = 'Seiten (data/pages)';

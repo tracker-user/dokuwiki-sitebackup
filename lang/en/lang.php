@@ -9,7 +9,7 @@ $lang['warn_body']  = 'The archive may contain password hashes (<code>conf/users
 
 // Fieldset legends
 $lang['fs_content'] = 'Wiki content';
-$lang['fs_code']    = 'Configuration &amp; code';
+$lang['fs_code']    = 'Configuration & code';
 
 // Checkbox labels
 $lang['opt_pages']       = 'Pages (data/pages)';
